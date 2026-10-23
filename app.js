@@ -20,7 +20,28 @@
   function store(k, v) {
     try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
   }
-  function best(id) { var v = parseInt(store("tv_best_" + id), 10); return isNaN(v) ? -1 : v; }
+  // Số sao cao nhất mỗi bài: học sinh đăng nhập lấy từ Supabase (theo từng em); khách lưu trên máy.
+  var serverBest = {};
+  function best(id) {
+    if (student()) return serverBest[id] || -1;
+    var v = parseInt(store("tv_guest_best_" + id), 10); return isNaN(v) ? -1 : v;
+  }
+  function setBest(id, stars) {
+    if (stars <= best(id)) return;
+    if (student()) serverBest[id] = stars; else store("tv_guest_best_" + id, String(stars));
+  }
+  /* ---------- tài khoản học sinh (Supabase) ---------- */
+  var SESSION_KEY = "tv_student";
+  function student() { try { return JSON.parse(store(SESSION_KEY)) || null; } catch (e) { return null; } }
+  function setStudent(v) { try { if (v) localStorage.setItem(SESSION_KEY, JSON.stringify(v)); else localStorage.removeItem(SESSION_KEY); } catch (e) { /* bỏ qua */ } }
+  function rpc(fn, body) {
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) return Promise.reject(new Error("no-config"));
+    return fetch(window.SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY },
+      body: JSON.stringify(body)
+    }).then(function (r) { if (!r.ok) throw new Error("http-" + r.status); return r.json(); });
+  }
   function fullWord(t, a) { var w = t; a.forEach(function (x) { w = w.replace("_", x); }); return w; }
   function gapWord(t) { return t.replace(/_/g, "…"); }
 
@@ -152,37 +173,94 @@
     app.innerHTML = ""; clearGhosts();
     var c = el("section", "intro-layer");
     c.appendChild(el("h1", null, "Góc âm vần lớp 1<br>Cô Ngọc Ánh"));
-    var go = el("button", "action start", "Bắt đầu");
-    go.addEventListener("click", function () { sfx.ok(); home(); });
-    c.appendChild(go);
+    var mine = el("button", "action start", "Học sinh lớp 1/4");
+    mine.addEventListener("click", function () { sfx.ok(); loginForm(); });
+    var other = el("button", "action start alt", "Học sinh khác");
+    other.addEventListener("click", function () { sfx.ok(); setStudent(null); home(); });
+    c.appendChild(mine); c.appendChild(other);
     app.appendChild(c);
+  }
+
+  /* ---------- đăng nhập học sinh lớp 1/4 ---------- */
+  function loginForm() {
+    app.innerHTML = ""; clearGhosts();
+    var c = el("section", "intro-layer");
+    c.appendChild(el("h1", null, "Học sinh lớp 1/4"));
+    var form = el("form", "login");
+    var lab = el("label", null, "Em hãy viết họ và tên đầy đủ (không dấu):");
+    var inp = el("input"); inp.type = "text"; inp.autocomplete = "off"; inp.autocapitalize = "words"; inp.spellcheck = false;
+    inp.placeholder = "Ví dụ: Nguyen Van An"; inp.maxLength = 60;
+    lab.appendChild(inp);
+    var msg = el("div", "login-msg"); msg.setAttribute("role", "alert");
+    var go = el("button", "action start", "Vào học"); go.type = "submit";
+    var back = el("button", "action ghost", "Quay lại"); back.type = "button";
+    back.addEventListener("click", intro);
+    form.appendChild(lab); form.appendChild(msg); form.appendChild(go); form.appendChild(back);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = inp.value.replace(/\s+/g, " ").trim();
+      if (!name) { msg.textContent = "Em hãy viết tên của mình nhé."; inp.focus(); return; }
+      go.disabled = true; msg.textContent = "Đang kiểm tra…";
+      rpc("login", { p_name: name }).then(function (rows) {
+        if (rows && rows.length) { setStudent({ token: rows[0].token, name: rows[0].full_name }); sfx.ok(); home(); }
+        else { msg.textContent = "Chưa thấy tên em trong danh sách. Em viết lại nhé!"; go.disabled = false; inp.focus(); }
+      }).catch(function (err) {
+        msg.textContent = err.message === "no-config" ? "Chưa kết nối được với hệ thống." : "Không kết nối được mạng. Em thử lại nhé!";
+        go.disabled = false;
+      });
+    });
+    c.appendChild(form);
+    app.appendChild(c);
+    inp.focus();
   }
 
   /* ---------- màn chọn bài ---------- */
   function home() {
     S = null;
     app.innerHTML = ""; clearGhosts();
+    var bar = el("div", "topbar");
     var back = el("button", "back", "← Trang đầu");
     back.addEventListener("click", intro);
-    app.appendChild(back);
+    bar.appendChild(back);
+    if (student()) {
+      var out = el("button", "back", "Đăng xuất");
+      out.addEventListener("click", function () { setStudent(null); intro(); });
+      bar.appendChild(out);
+    }
+    app.appendChild(bar);
     var head = el("div", "home-head", SNOWMAN);
     var t = el("div");
     t.appendChild(el("h1", null, "Chọn bài"));
-    t.appendChild(el("p", null, "Mỗi bài có nhiều trò chơi khác nhau"));
+    var me = student();
+    t.appendChild(el("p", null, me ? "Chào " + esc(me.name) + "!" : "Mỗi bài có nhiều trò chơi khác nhau"));
     head.appendChild(t);
     app.appendChild(head);
 
-    var grid = el("div", "lessons");
+    var grid = el("div", "lessons"), starEls = {};
+    function paint() {
+      LESSONS.forEach(function (L) {
+        var st = best(L.id), stars = "";
+        for (var i = 1; i <= 3; i++) stars += '<span class="' + (st >= i ? "" : "off") + '">★</span>';
+        starEls[L.id].innerHTML = stars;
+      });
+    }
     LESSONS.forEach(function (L) {
       var b = el("button", "lesson");
-      var st = best(L.id);
-      var stars = "";
-      for (var i = 1; i <= 3; i++) stars += '<span class="' + (st >= i ? "" : "off") + '">★</span>';
       b.innerHTML = '<span class="n">Bài số ' + L.id + '</span><span class="pair">' + esc(L.pair[0]) + " / " + esc(L.pair[1]) +
-        '</span><span class="meta">' + plan(L).length + ' trò chơi</span><span class="stars">' + stars + "</span>";
+        '</span><span class="meta">' + plan(L).length + ' trò chơi</span><span class="stars"></span>';
+      starEls[L.id] = b.querySelector(".stars");
       b.addEventListener("click", function () { start(L); });
       grid.appendChild(b);
     });
+    serverBest = {};
+    paint();
+    if (me) {
+      rpc("my_best", { p_token: me.token }).then(function (rows) {
+        var m = {};
+        (rows || []).forEach(function (r) { m[r.lesson_id] = r.stars; });
+        serverBest = m; paint();
+      }).catch(function () { /* không tải được thì để trống */ });
+    }
     app.appendChild(grid);
     app.appendChild(el("p", "note", "Nội dung biến tấu từ tài liệu “Bài tập chính tả (phân biệt âm – vần)” của cô Ngọc Ánh."));
   }
@@ -567,9 +645,18 @@
   function result() {
     var n = S.qs.length, ok = S.firstTry, pct = S.score / (n * POINTS);
     var stars = pct >= 0.9 ? 3 : pct >= 0.6 ? 2 : 1;
-    if (stars > best(S.L.id)) store("tv_best_" + S.L.id, String(stars));
+    setBest(S.L.id, stars);
     sfx.win();
     app.innerHTML = ""; clearGhosts();
+    var me = student(), saveNote = null;
+    if (me) {
+      saveNote = el("div", "save-note", "Đang lưu kết quả…");
+      rpc("save_result", { p_token: me.token, p_lesson: S.L.id, p_score: S.score, p_stars: stars, p_first_try: ok, p_total: n })
+        .then(function (okSaved) {
+          saveNote.textContent = okSaved === true ? "Đã lưu kết quả." : "Chưa lưu được kết quả. Em hãy đăng nhập lại nhé.";
+        })
+        .catch(function () { saveNote.textContent = "Chưa lưu được kết quả (lỗi mạng)."; });
+    }
     var card = el("section", "qcard result");
     card.appendChild(el("div", null, SNOWMAN));
     card.appendChild(el("h2", null, "Kết quả · Bài số " + S.L.id));
@@ -580,6 +667,7 @@
     card.appendChild(el("div", null, "Đúng ngay lần đầu: <b>" + ok + "/" + n + "</b> trò chơi"));
     var msg = stars === 3 ? "Giỏi quá! Con làm rất tốt." : stars === 2 ? "Khá lắm! Làm lại để đạt 3 sao nhé." : "Cố lên! Mình luyện thêm một lần nữa nhé.";
     card.appendChild(el("div", "prompt", msg));
+    if (saveNote) card.appendChild(saveNote);
     var btns = el("div", "btns");
     var again = el("button", "action next", "Làm lại");
     again.addEventListener("click", function () { start(S.L); });

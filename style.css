@@ -68,6 +68,7 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 2px; }
   display: grid; place-items: center; box-shadow: 0 3px 0 #5f3fa3;
 }
 .round-btn[aria-pressed="false"] { background: #9aa7b8; box-shadow: 0 3px 0 #6f7c8d; }
+.topbar { display: flex; justify-content: space-between; align-items: center; }
 .back { background: transparent; color: var(--ink); font-weight: 800; padding: 8px 4px; font-size: 16px; }
 .progress { height: 8px; background: rgba(255,255,255,.7); border-radius: 99px; overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--btn-teal); border-radius: 99px; transition: width .3s; }
@@ -177,6 +178,13 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 2px; }
   .intro-layer { background-image: url("intro-pc.webp"); }
 }
 .intro-layer > * { max-width: 560px; }
+.action.start.alt { background: #fff; color: var(--ink); border: 3px solid var(--sky-deep); box-shadow: 0 6px 0 var(--sky-deep); }
+.login { width: min(420px, 100%); display: grid; gap: 14px; background: rgba(255, 255, 255, .92); border-radius: 22px; padding: 18px; }
+.login label { display: grid; gap: 8px; text-align: left; font-weight: 800; font-size: 18px; color: var(--ink); }
+.login input { font: inherit; font-size: 22px; padding: 12px 14px; border: 3px solid var(--sky-deep); border-radius: 14px; width: 100%; box-sizing: border-box; }
+.login-msg { min-height: 22px; font-weight: 700; color: var(--bad); }
+.login .action { width: 100%; }
+.save-note { font-size: 15px; color: var(--ink-soft); }
 .intro-layer h1 { font-size: clamp(34px, 9.5vw, 52px); color: var(--ink); text-wrap: balance; text-shadow: 0 2px 0 rgba(255, 255, 255, .85); }
 .intro-layer .action.start { width: min(320px, 100%); }
 .snowman { width: 64px; height: 76px; }
