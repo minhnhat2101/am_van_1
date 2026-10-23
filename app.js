@@ -437,39 +437,127 @@
     app.appendChild(c);
   }
 
+  /* ---------- lịch tuần (cấu hình ở SCHOOL_YEAR, config.js) ---------- */
+  function dayStart(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function parseYMD(str) { var p = str.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  // Ngày bắt đầu tuần n: ghi đè gần nhất ở weekStarts (n' <= n) rồi cộng 7 ngày mỗi tuần; không có thì tính từ week1Start.
+  function weekStart(n) {
+    var Y = window.SCHOOL_YEAR, base = 1, d = parseYMD(Y.week1Start), k;
+    for (k in Y.weekStarts) {
+      if (Y.weekStarts.hasOwnProperty(k) && +k <= n && +k > base) { base = +k; d = parseYMD(Y.weekStarts[k]); }
+    }
+    return addDays(d, 7 * (n - base));
+  }
+  function isWeekOpen(n, today) { return dayStart(today || new Date()).getTime() >= weekStart(n).getTime(); }
+  function currentWeek(today) {
+    var Y = window.SCHOOL_YEAR, cur = Y.firstWeek, n;
+    for (n = Y.firstWeek; n <= Y.lastWeek; n++) if (isWeekOpen(n, today)) cur = n;
+    return cur;
+  }
+  function dmy(d) { return d.getDate() + "/" + (d.getMonth() + 1); }
+  function weekRange(n) {
+    var a = weekStart(n), z = addDays(a, 6);
+    return a.getMonth() === z.getMonth() ? a.getDate() + "–" + dmy(z) : dmy(a) + "–" + dmy(z);
+  }
+  function reducedMotion() { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
+
   /* ---------- màn chọn bài ---------- */
-  function home() {
+  // Trạng thái phiên của màn này: tuần đang chọn và section bài tập đang thu lại hay không.
+  var homeWeek = null, homeCollapsed = false;
+  // back = true khi quay lại sau lúc chơi: giữ tuần cũ, thu section bài tập, cuộn lên đầu.
+  function home(back) {
     S = null;
+    if (back !== true || homeWeek === null) { homeWeek = currentWeek(); homeCollapsed = false; }
+    else homeCollapsed = true;
     app.innerHTML = ""; clearGhosts();
     var bar = el("div", "topbar");
     bar.appendChild(breadcrumb(rootCrumbs().concat([{ label: "Học bài", fn: chooser }, { label: "Bài tập âm vần" }])));
     app.appendChild(bar);
     var head = el("div", "home-head", SNOWMAN);
     var t = el("div");
-    t.appendChild(el("h1", null, "Chọn bài"));
+    t.appendChild(el("h1", null, "Em muốn làm bài tập tuần nào?"));
     var me = student();
     t.appendChild(el("p", null, me ? "Chào " + esc(me.name) + "!" : "Mỗi bài có nhiều trò chơi khác nhau"));
     head.appendChild(t);
     app.appendChild(head);
 
-    var grid = el("div", "lessons"), starEls = {};
+    var Y = window.SCHOOL_YEAR, weekBtns = {}, weekRow = el("div", "week-row"), n;
+    weekRow.setAttribute("role", "group"); weekRow.setAttribute("aria-label", "Chọn tuần");
+    function markWeeks() {
+      for (var k in weekBtns) if (weekBtns.hasOwnProperty(k)) {
+        var on = +k === homeWeek;
+        weekBtns[k].className = "week-btn" + (on ? " sel" : "");
+        if (!weekBtns[k].disabled) weekBtns[k].setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    }
+    function centerWeek() {
+      var b = weekBtns[homeWeek];
+      if (b && b.scrollIntoView) b.scrollIntoView({ inline: "center", block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+    }
+    function mkWeek(w) {
+      var open = isWeekOpen(w), b = el("button", "week-btn");
+      b.innerHTML = '<span class="week-n">Tuần ' + w + '</span><span class="week-d">' + weekRange(w) + "</span>";
+      if (open) {
+        b.addEventListener("click", function () {
+          sfx.ok(); homeWeek = w; homeCollapsed = false;
+          markWeeks(); drawLessons(); setCollapsed(false);
+        });
+      } else {
+        b.disabled = true;
+        b.title = "Tuần " + w + " mở từ " + dmy(weekStart(w));
+        b.setAttribute("aria-label", "Tuần " + w + ", mở từ " + dmy(weekStart(w)));
+      }
+      weekBtns[w] = b; weekRow.appendChild(b);
+    }
+    for (n = Y.firstWeek; n <= Y.lastWeek; n++) mkWeek(n);
+    var weekSec = el("section", "week-sec");
+    weekSec.appendChild(weekRow);
+    app.appendChild(weekSec);
+
+    var lessonSec = el("section", "week-lessons"), lessonIn = el("div", "week-lessons-in");
+    lessonSec.appendChild(lessonIn);
+    app.appendChild(lessonSec);
+    function setCollapsed(c) {
+      lessonSec.classList.toggle("collapsed", c);
+      if (c) lessonSec.setAttribute("aria-hidden", "true"); else lessonSec.removeAttribute("aria-hidden");
+      if ("inert" in lessonSec) lessonSec.inert = c;
+      if (!c) setTimeout(function () {
+        var r = lessonSec.getBoundingClientRect();
+        if (r.bottom > window.innerHeight) lessonSec.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+      }, 60);
+    }
+
+    var starEls = {};
     function paint() {
       LESSONS.forEach(function (L) {
+        if (!starEls[L.id]) return;
         var st = best(L.id), stars = "";
         for (var i = 1; i <= 3; i++) stars += '<span class="' + (st >= i ? "" : "off") + '">★</span>';
         starEls[L.id].innerHTML = stars;
       });
     }
-    LESSONS.forEach(function (L) {
-      var b = el("button", "lesson");
-      b.innerHTML = '<span class="n">Bài số ' + L.id + '</span><span class="pair">' + esc(L.pair[0]) + " / " + esc(L.pair[1]) +
-        '</span><span class="meta">' + plan(L).length + ' trò chơi</span><span class="stars"></span>';
-      starEls[L.id] = b.querySelector(".stars");
-      b.addEventListener("click", function () { start(L); });
-      grid.appendChild(b);
-    });
+    function drawLessons() {
+      lessonIn.innerHTML = ""; starEls = {};
+      var list = LESSONS.filter(function (L) { return L.week === homeWeek; });
+      if (!list.length) {
+        lessonIn.appendChild(el("p", "week-empty", "Tuần này chưa có bài tập, em quay lại sau nhé!"));
+        return;
+      }
+      var grid = el("div", "lessons");
+      list.forEach(function (L) {
+        var b = el("button", "lesson");
+        b.innerHTML = '<span class="n">Bài số ' + L.id + '</span><span class="pair">' + esc(L.pair[0]) + " / " + esc(L.pair[1]) +
+          '</span><span class="meta">' + plan(L).length + ' trò chơi</span><span class="stars"></span>';
+        starEls[L.id] = b.querySelector(".stars");
+        b.addEventListener("click", function () { start(L); });
+        grid.appendChild(b);
+      });
+      lessonIn.appendChild(grid);
+      paint();
+    }
     serverBest = {};
-    paint();
+    markWeeks(); drawLessons(); setCollapsed(homeCollapsed);
     if (me) {
       rpc("my_best", { p_token: me.token }).then(function (rows) {
         var m = {};
@@ -477,8 +565,11 @@
         serverBest = m; paint();
       }).catch(function () { /* không tải được thì để trống */ });
     }
-    app.appendChild(grid);
     app.appendChild(el("p", "note", "Nội dung biến tấu từ tài liệu “Bài tập chính tả (phân biệt âm – vần)” của cô Ngọc Ánh."));
+    // Cuộn hàng tuần tới tuần đang chọn; khi quay lại sau lúc chơi thì cuộn trang lên đầu.
+    weekRow.scrollLeft = 0;
+    if (back === true) window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
+    setTimeout(centerWeek, 0);
   }
 
   /* ---------- tạo danh sách trò chơi từ dữ liệu bài ---------- */
@@ -510,7 +601,7 @@
   function topBar() {
     var bar = el("div", "bar");
     var back = el("button", "back", "← Bài khác");
-    back.addEventListener("click", home);
+    back.addEventListener("click", function () { home(true); });
     bar.appendChild(back);
     bar.appendChild(el("div", "spacer"));
     bar.appendChild(el("div", "chip", (S.i + 1) + "/" + S.qs.length));
@@ -888,7 +979,7 @@
     var again = el("button", "action next", "Làm lại");
     again.addEventListener("click", function () { start(S.L); });
     var other = el("button", "action ghost", "Chọn bài khác");
-    other.addEventListener("click", home);
+    other.addEventListener("click", function () { home(true); });
     btns.appendChild(again); btns.appendChild(other);
     card.appendChild(btns);
     app.appendChild(card);

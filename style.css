@@ -290,3 +290,25 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 2px; }
   .tok.bad, .find.bad { animation: none; }
   .mem .face { transition: none; }
 }
+
+/* Chọn tuần (issue 004) */
+.week-sec { margin: 4px 0 14px; }
+.week-row {
+  display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding: 6px 4px 12px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.week-btn {
+  flex: 0 0 auto; min-width: 84px; min-height: 56px; padding: 6px 12px; scroll-snap-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-family: var(--font-body); color: #fff; background: var(--btn-blue); border: 3px solid var(--btn-blue);
+  border-radius: 16px; cursor: pointer; box-shadow: 0 4px 0 rgba(23,51,90,.35);
+}
+.week-btn.sel { border-color: var(--gold); outline: 3px solid var(--ink); outline-offset: 1px; font-weight: 800; }
+.week-btn:disabled { background: #c3ccd6; border-color: #c3ccd6; color: #6b7785; cursor: not-allowed; box-shadow: none; }
+.week-n { font-family: var(--font-display); font-size: 18px; font-weight: 800; }
+.week-d { font-size: 12px; opacity: .9; }
+.week-lessons { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .3s ease, opacity .3s ease; }
+.week-lessons.collapsed { grid-template-rows: 0fr; opacity: 0; }
+.week-lessons-in { overflow: hidden; min-height: 0; }
+.week-empty { text-align: center; color: var(--ink-soft); font-weight: 700; padding: 20px 0; }
+@media (prefers-reduced-motion: reduce) { .week-lessons { transition: none; } }

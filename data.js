@@ -1,5 +1,6 @@
 /* Dữ liệu bài tập – chép từ "CÔ ÁNH – BT PHÂN BIỆT CHÍNH TẢ".
-   Thêm bài mới: copy một khối trong LESSONS và sửa lại.
+   Thêm bài mới: copy một khối trong LESSONS và sửa lại (id mới không trùng id cũ).
+   week: số tuần học mà bài thuộc về (lịch tuần cấu hình ở SCHOOL_YEAR trong config.js).
 
    Câu điền chỗ trống (kind:"fill"):
      t   : chuỗi có dấu "_" tại mỗi chỗ trống
@@ -11,7 +12,7 @@
    Sắp xếp câu (kind:"order"): tokens = các mảnh câu, a = câu hoàn chỉnh */
 var LESSONS = [
   {
-    id: 1, title: "c hoặc k", pair: ["c", "k"],
+    id: 1, week: 7, title: "c hoặc k", pair: ["c", "k"],
     q: [
       { kind: "fill", img: "s1_a1", t: "con _ua", a: ["c"] },
       { kind: "fill", img: "s1_a2", t: "cái _éo", a: ["k"] },
@@ -31,7 +32,7 @@ var LESSONS = [
     ]
   },
   {
-    id: 2, title: "c hoặc k", pair: ["c", "k"],
+    id: 2, week: 7, title: "c hoặc k", pair: ["c", "k"],
     q: [
       { kind: "fill", img: "s2_a1", t: "_im _ương", a: ["k", "c"] },
       { kind: "fill", img: "s2_a2", t: "_ánh _ổng", a: ["c", "c"] },
@@ -50,7 +51,7 @@ var LESSONS = [
     ]
   },
   {
-    id: 3, title: "g hoặc gh", pair: ["g", "gh"],
+    id: 3, week: 7, title: "g hoặc gh", pair: ["g", "gh"],
     q: [
       { kind: "fill", img: "s3_a1", t: "_à mái", a: ["g"] },
       { kind: "fill", img: "s3_a2", t: "_i chép", a: ["gh"] },
@@ -70,7 +71,7 @@ var LESSONS = [
     ]
   },
   {
-    id: 4, title: "g hoặc gh", pair: ["g", "gh"],
+    id: 4, week: 7, title: "g hoặc gh", pair: ["g", "gh"],
     q: [
       { kind: "fill", img: "s4_a1", t: "_ào khóc", a: ["g"] },
       { kind: "fill", img: "s4_a2", t: "_é thăm", a: ["gh"] },
@@ -89,7 +90,7 @@ var LESSONS = [
     ]
   },
   {
-    id: 5, title: "ng hoặc ngh", pair: ["ng", "ngh"],
+    id: 5, week: 7, title: "ng hoặc ngh", pair: ["ng", "ngh"],
     q: [
       { kind: "fill", img: "s5_a1", t: "_ồi bệt", a: ["ng"] },
       { kind: "fill", img: "s5_a2", t: "củ _ệ", a: ["ngh"] },
@@ -109,7 +110,7 @@ var LESSONS = [
     ]
   },
   {
-    id: 6, title: "ng hoặc ngh", pair: ["ng", "ngh"],
+    id: 6, week: 7, title: "ng hoặc ngh", pair: ["ng", "ngh"],
     q: [
       { kind: "fill", img: "s6_a1", t: "ống _iệm", a: ["ngh"] },
       { kind: "fill", img: "s6_a2", t: "_ôi sao", a: ["ng"] },
