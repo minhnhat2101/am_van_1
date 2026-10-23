@@ -40,13 +40,25 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 2px; }
 /* màn Home học sinh */
 .shome-hello { font-family: var(--font-display); font-size: clamp(20px, 5vw, 28px); font-weight: 800; color: var(--ink); }
 .score-stage {
-  width: min(100%, 360px, 42vh); aspect-ratio: 1 / 1; margin: 16px auto; border-radius: 28px;
-  background: rgba(255,255,255,.75); border: 3px solid var(--sky-deep);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; width: min(100%, 640px, 78vh); aspect-ratio: 1200 / 810; margin: 12px auto; border-radius: 24px;
+  background: var(--sky-deep); border: 3px solid var(--sky-deep);
 }
-.shome-total { font-family: var(--font-display); font-size: clamp(44px, 12vw, 72px); font-weight: 800; color: var(--btn-blue); line-height: 1; }
-.shome-total span { color: var(--gold); }
-.shome-max { color: var(--ink-soft); font-size: 16px; margin-top: 6px; }
+.garden-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.garden-target { position: absolute; width: 0; height: 0; pointer-events: none; }
+.garden-jar { position: absolute; left: 3%; bottom: 4%; width: 20%; text-align: center; }
+.garden-jar-svg svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 3px 3px rgba(0,0,0,.25)); }
+.garden-jar-n { font-family: var(--font-display); font-weight: 800; font-size: clamp(16px, 4vw, 24px); color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,.45); }
+.garden-progress { position: absolute; right: 3%; top: 3%; padding: 2px 10px; border-radius: 12px; background: rgba(255,255,255,.8); font-weight: 700; color: var(--ink); }
+.garden-progress:empty { display: none; }
+.garden-fly { position: absolute; left: 0; top: 0; font-size: clamp(26px, 6vw, 42px); line-height: 1; color: #ffc83d; text-shadow: 0 0 8px #fff, 0 2px 3px rgba(0,0,0,.35); pointer-events: none; will-change: transform; }
+.garden-spark { position: absolute; transform: translate(-50%, -50%); color: #fff6b0; font-size: 22px; text-shadow: 0 0 6px #ffc83d; pointer-events: none; animation: garden-spark 1s ease-out forwards; }
+@keyframes garden-spark { from { opacity: 1; transform: translate(-50%, -50%) scale(.6); } to { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.4); } }
+.garden-grow { animation: garden-grow .8s ease-out; }
+.garden-wiggle { animation: garden-wiggle .6s ease-in-out; }
+@keyframes garden-grow { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 70% { transform: scale(.98); } 100% { transform: scale(1); } }
+@keyframes garden-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-1.6deg); } 75% { transform: rotate(1.6deg); } }
+.shome-btns .action.dim { opacity: .55; }
+@media (prefers-reduced-motion: reduce) { .garden-grow, .garden-wiggle, .garden-spark { animation: none; } }
 .shome-btns { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .shome-btns .action { width: min(320px, 100%); }
 .shome-note { text-align: center; color: var(--ink-soft); min-height: 1.4em; margin: 10px 0 0; }

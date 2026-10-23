@@ -215,18 +215,130 @@
   }
 
   /* ---------- màn Home của học sinh đã đăng nhập ---------- */
-  // Đổi tên/hành vi nút ở đây; fn = null nghĩa là "Sắp có".
+  // Đổi tên/hành vi nút ở đây; fn = null nghĩa là "Sắp có". fn nhận (nút, dòng thông báo).
   var SHOME_BUTTONS = [
     { id: "learn", label: "Học bài", fn: function () { home(); } },
-    { id: "scores", label: "Điểm của em", fn: null },
+    { id: "feed", label: "Bón phân", fn: function (b, note) { feedPlant(b, note); } },
     { id: "review", label: "Ôn lại", fn: null }
   ];
 
-  // Khung hoạt ảnh điểm: sau này chỉ cần thay nội dung hàm này. data = { total, max } hoặc null nếu chưa tải được.
-  function renderScoreStage(box, data) {
-    box.innerHTML = data
-      ? '<div class="shome-total">' + data.total + ' <span>★</span></div><div class="shome-max">trên ' + data.max + ' sao</div>'
-      : '<div class="shome-total">—</div>';
+  /* ---------- vườn "Cây ngôi sao" ---------- */
+  var GARDEN = {
+    min: -2, max: 5,
+    // Số sao cần bón để lên 1 stage: nhập ở config.js, phải khớp supabase/garden.sql (server mới là nơi quyết định).
+    cost: Math.max(1, parseInt(window.GARDEN_STARS_PER_STAGE, 10) || 1),
+    // Gốc cây (% khung ảnh) — tâm phóng to/lắc của ảnh.
+    base: [62, 77],
+    // Điểm ngôi sao bay tới (% khung ảnh [x, y]) theo stage; chỉnh khi thay ảnh.
+    target: { "-2": [62, 76], "-1": [62, 75], "0": [62, 76], "1": [62, 73], "2": [62, 66], "3": [62, 58], "4": [62, 48], "5": [62, 38] }
+  };
+  var JAR_SLOTS = [[50, 96], [34, 92], [66, 92], [42, 78], [58, 78], [30, 74], [70, 74], [50, 64]];
+  var gui = null; // trạng thái màn vườn hiện tại: { box, g, busy, note }
+  function gardenImg(s) { return "img/garden_" + (s < 0 ? "m" + (-s) : s) + ".webp"; }
+  function gardenData(r) {
+    return { earned: r.earned | 0, spent: r.spent | 0, jar: r.jar | 0, progress: r.progress | 0, wilted: r.wilted | 0,
+      stage: Math.max(GARDEN.min, Math.min(GARDEN.max, r.stage | 0)) };
+  }
+  function jarSvg(n) {
+    var s = "";
+    JAR_SLOTS.forEach(function (p, i) { if (i < n) s += '<text x="' + p[0] + '" y="' + p[1] + '" font-size="26" text-anchor="middle" fill="#ffc83d" stroke="#e29a00" stroke-width="1.5">★</text>'; });
+    return '<svg viewBox="0 0 100 120" aria-hidden="true">' +
+      '<rect x="30" y="4" width="40" height="12" rx="4" fill="#c98a4b"/>' +
+      '<path d="M32 16 H68 V24 Q86 32 86 52 V102 Q86 114 74 114 H26 Q14 114 14 102 V52 Q14 32 32 24 Z" fill="rgba(255,255,255,.55)" stroke="#8fc4e8" stroke-width="4"/>' +
+      s + '</svg>';
+  }
+  function setPct(node, xy) { node.style.left = xy[0] + "%"; node.style.top = xy[1] + "%"; }
+  // Vẽ khung vườn. g = dữ liệu vườn hoặc null nếu chưa tải được.
+  function renderGarden(box, g) {
+    if (!box.firstChild) {
+      box.innerHTML = '<img class="garden-img" alt="Cây ngôi sao" draggable="false"><div class="garden-target"></div>' +
+        '<div class="garden-jar"><div class="garden-jar-svg"></div><div class="garden-jar-n"></div></div><div class="garden-progress"></div>';
+      var im = box.querySelector(".garden-img");
+      im.style.transformOrigin = GARDEN.base[0] + "% " + GARDEN.base[1] + "%";
+    }
+    var stage = g ? g.stage : 0, img = box.querySelector(".garden-img");
+    if (img.getAttribute("src") !== gardenImg(stage)) img.src = gardenImg(stage);
+    setPct(box.querySelector(".garden-target"), GARDEN.target[stage]);
+    box.querySelector(".garden-jar-svg").innerHTML = jarSvg(g ? g.jar : 0);
+    box.querySelector(".garden-jar-n").textContent = g ? "× " + g.jar : "—";
+    var pr = box.querySelector(".garden-progress");
+    pr.textContent = g && GARDEN.cost > 1 && stage < GARDEN.max ? g.progress + "/" + GARDEN.cost + " ★" : "";
+    [stage + 1, stage - 1].forEach(function (s) { if (s >= GARDEN.min && s <= GARDEN.max) new Image().src = gardenImg(s); });
+  }
+  function gardenReduced() { return window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; }
+  function gardenLast(me, g) {
+    if (g) store("tv_garden_last", JSON.stringify({ t: me.token, g: g }));
+    try { var c = JSON.parse(store("tv_garden_last")); return c && c.t === me.token ? c.g : null; } catch (e) { return null; }
+  }
+  function gardenDim(btn) {
+    if (btn) btn.classList.toggle("dim", !!gui && !!gui.g && (gui.g.jar <= 0 || gui.g.stage >= GARDEN.max));
+  }
+  // Ngôi sao bay từ hũ tới cây rồi gọi done (đúng một lần, kể cả khi hiệu ứng bị huỷ).
+  function flyStar(box, done) {
+    var jar = box.querySelector(".garden-jar-svg"), tgt = box.querySelector(".garden-target");
+    var star = el("div", "garden-fly", "★"), finished = false;
+    function finish() { if (finished) return; finished = true; star.remove(); done(); }
+    if (gardenReduced() || typeof star.animate !== "function") { done(); return; }
+    var br = box.getBoundingClientRect(), jr = jar.getBoundingClientRect(), tr = tgt.getBoundingClientRect();
+    var sx = jr.left + jr.width / 2 - br.left, sy = jr.top + jr.height * 0.3 - br.top;
+    var ex = tr.left - br.left, ey = tr.top - br.top;
+    function at(x, y, s) { return "translate(" + x + "px," + y + "px) translate(-50%,-50%) scale(" + s + ")"; }
+    box.appendChild(star);
+    var a = star.animate([
+      { transform: at(sx, sy, 1), opacity: 1 },
+      { transform: at((sx + ex) / 2, Math.min(sy, ey) - br.height * 0.18, 1.5), opacity: 1, offset: 0.5 },
+      { transform: at(ex, ey, 0.6), opacity: 0.9 }
+    ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
+    a.onfinish = finish; a.oncancel = finish;
+    setTimeout(finish, 1400);
+  }
+  function feedPlant(btn, note) {
+    var u = gui, me = student();
+    if (!u || !me || u.busy) return;
+    if (!u.g) { note.textContent = "Vườn đang tải, em đợi một chút nhé!"; return; }
+    if (u.g.stage >= GARDEN.max) { note.textContent = "Cây đã lớn hết cỡ rồi, giỏi quá!"; sfx.win(); return; }
+    if (u.g.jar <= 0) { note.textContent = "Hũ hết sao rồi, em làm bài để có thêm sao nhé!"; sfx.no(); return; }
+    u.busy = true; note.textContent = "";
+    rpc("feed_plant", { p_token: me.token }).then(function (rows) {
+      if (gui !== u || !u.box.isConnected) return;
+      if (!rows || !rows.length) throw new Error("empty");
+      var old = u.g, n = gardenData(rows[0]);
+      if (n.spent <= old.spent) { // server không trừ sao: chỉ đồng bộ lại
+        u.g = n; gardenLast(me, n); renderGarden(u.box, n); gardenDim(btn); u.busy = false;
+        note.textContent = n.jar <= 0 ? "Hũ hết sao rồi, em làm bài để có thêm sao nhé!" : ""; return;
+      }
+      u.box.querySelector(".garden-jar-svg").innerHTML = jarSvg(n.jar);
+      u.box.querySelector(".garden-jar-n").textContent = "× " + n.jar;
+      sfx.pop();
+      flyStar(u.box, function () {
+        u.busy = false;
+        if (gui !== u || !u.box.isConnected) return;
+        u.g = n; gardenLast(me, n);
+        renderGarden(u.box, n); gardenDim(btn);
+        var img = u.box.querySelector(".garden-img"), grew = n.stage !== old.stage;
+        img.classList.remove("garden-grow", "garden-wiggle");
+        void img.offsetWidth;
+        img.classList.add(grew ? "garden-grow" : "garden-wiggle");
+        setTimeout(function () { img.classList.remove("garden-grow", "garden-wiggle"); }, 900);
+        if (grew) {
+          sfx.win();
+          if (!gardenReduced()) {
+            for (var i = 0; i < 7; i++) {
+              var sp = el("span", "garden-spark", "✦");
+              sp.style.setProperty("--dx", Math.round(Math.cos(i * 0.9) * 60) + "px");
+              sp.style.setProperty("--dy", Math.round(Math.sin(i * 0.9) * 60 - 20) + "px");
+              setPct(sp, GARDEN.target[n.stage]);
+              u.box.appendChild(sp);
+              setTimeout(function (s) { return function () { s.remove(); }; }(sp), 1000);
+            }
+          }
+          note.textContent = n.stage === GARDEN.max ? "Cây đã ra đầy sao rồi, em giỏi quá!" : "Cây lớn lên rồi!";
+        } else sfx.ok();
+      });
+    }).catch(function () {
+      u.busy = false;
+      note.textContent = "Không kết nối được, em thử lại nhé!";
+    });
   }
 
   function studentHome() {
@@ -242,30 +354,37 @@
     app.appendChild(bar);
 
     var stage = el("div", "score-stage"); stage.id = "score-stage";
-    renderScoreStage(stage, null);
+    var mine = gui = { box: stage, g: gardenLast(me, null), busy: false };
+    renderGarden(stage, mine.g);
     app.appendChild(stage);
 
-    var row = el("div", "shome-btns"), note = el("p", "shome-note");
+    var row = el("div", "shome-btns"), note = el("p", "shome-note"), feedBtn = null;
     note.setAttribute("role", "status");
     SHOME_BUTTONS.forEach(function (d) {
       var b = el("button", "action start", esc(d.label));
+      if (d.id === "feed") feedBtn = b;
       b.addEventListener("click", function () {
         sfx.ok();
-        if (d.fn) d.fn(); else note.textContent = "“" + d.label + "” sắp có, em chờ nhé!";
+        if (d.fn) d.fn(b, note); else note.textContent = "“" + d.label + "” sắp có, em chờ nhé!";
       });
       row.appendChild(b);
     });
     app.appendChild(row);
     app.appendChild(note);
+    gardenDim(feedBtn);
 
+    rpc("get_garden", { p_token: me.token }).then(function (rows) {
+      if (gui !== mine || !stage.isConnected || !rows || !rows.length || mine.busy) return;
+      var g = gardenData(rows[0]);
+      mine.g = g; gardenLast(me, g);
+      renderGarden(stage, g); gardenDim(feedBtn);
+      if (g.wilted > 0) note.textContent = "Cây hơi buồn vì lâu rồi chưa được bón. Em làm bài để có sao bón cây nhé!";
+    }).catch(function () { /* chưa chạy garden.sql hoặc mạng yếu: giữ trạng thái cuối cùng biết được */ });
     rpc("my_best", { p_token: me.token }).then(function (rows) {
-      if (!stage.isConnected) return;
-      var m = {}, total = 0;
+      var m = {};
       (rows || []).forEach(function (r) { m[r.lesson_id] = r.stars; });
-      LESSONS.forEach(function (L) { total += Math.max(0, m[L.id] || 0); });
       serverBest = m;
-      renderScoreStage(stage, { total: total, max: LESSONS.length * 3 });
-    }).catch(function () { /* mạng yếu thì để "—" */ });
+    }).catch(function () { /* bỏ qua */ });
   }
 
   /* ---------- màn chọn bài ---------- */

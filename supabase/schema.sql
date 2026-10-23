@@ -76,3 +76,5 @@ grant execute on function public.my_best(uuid) to anon, authenticated;
 -- Xem báo cáo (chạy trong SQL Editor):
 -- select s.full_name, r.lesson_id, r.score, r.stars, r.first_try, r.total, r.created_at
 -- from public.results r join public.students s on s.id = r.student_id order by r.created_at desc;
+
+-- Cây ngôi sao (issue 002): chạy thêm supabase/garden.sql (bảng plants, get_garden, feed_plant).
