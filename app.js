@@ -176,7 +176,7 @@
     var mine = el("button", "action start", "Học sinh lớp 1/4");
     mine.addEventListener("click", function () { sfx.ok(); loginForm(); });
     var other = el("button", "action start alt", "Học sinh khác");
-    other.addEventListener("click", function () { sfx.ok(); setStudent(null); home(); });
+    other.addEventListener("click", function () { sfx.ok(); setStudent(null); chooser(); });
     c.appendChild(mine); c.appendChild(other);
     app.appendChild(c);
   }
@@ -217,7 +217,7 @@
   /* ---------- màn Home của học sinh đã đăng nhập ---------- */
   // Đổi tên/hành vi nút ở đây; fn = null nghĩa là "Sắp có". fn nhận (nút, dòng thông báo).
   var SHOME_BUTTONS = [
-    { id: "learn", label: "Học bài", fn: function () { home(); } },
+    { id: "learn", label: "Học bài", fn: function () { chooser(); } },
     { id: "feed", label: "Bón phân", fn: function (b, note) { feedPlant(b, note); } },
     { id: "review", label: "Ôn lại", fn: null }
   ];
@@ -387,14 +387,62 @@
     }).catch(function () { /* bỏ qua */ });
   }
 
+  /* ---------- breadcrumb & trang lựa chọn ---------- */
+  // items = [{ label, fn }]; mục cuối (màn hiện tại) không có fn nên không bấm được.
+  function breadcrumb(items) {
+    var nav = el("nav", "crumb-nav"); nav.setAttribute("aria-label", "Đường dẫn");
+    var ol = el("ol", "crumb-list");
+    items.forEach(function (it, i) {
+      var li = el("li", "crumb-item");
+      if (i > 0) { var sep = el("span", "crumb-sep", "›"); sep.setAttribute("aria-hidden", "true"); li.appendChild(sep); }
+      if (it.fn) {
+        var b = el("button", "crumb-link", esc(it.label));
+        b.addEventListener("click", function () { sfx.ok(); it.fn(); });
+        li.appendChild(b);
+      } else {
+        var cur = el("span", "crumb-current", esc(it.label)); cur.setAttribute("aria-current", "page");
+        li.appendChild(cur);
+      }
+      ol.appendChild(li);
+    });
+    nav.appendChild(ol);
+    return nav;
+  }
+  function rootCrumbs() { return student() ? [{ label: "Trang chủ", fn: studentHome }] : [{ label: "Trang đầu", fn: intro }]; }
+
+  // fn = null nghĩa là "Sắp có".
+  var CHOOSER_BUTTONS = [
+    { id: "sound", icon: "✏️", label: "Bài tập âm vần", fn: function () { home(); } },
+    { id: "read", icon: "📖", label: "Luyện đọc", fn: null }
+  ];
+  function chooser() {
+    S = null;
+    app.innerHTML = ""; clearGhosts();
+    var bar = el("div", "topbar");
+    bar.appendChild(breadcrumb(rootCrumbs().concat([{ label: "Học bài" }])));
+    app.appendChild(bar);
+    var c = el("section", "chooser-box");
+    c.appendChild(el("h1", null, "Em muốn học gì nào?"));
+    var row = el("div", "chooser-btns"), note = el("p", "shome-note");
+    note.setAttribute("role", "status");
+    CHOOSER_BUTTONS.forEach(function (d) {
+      var b = el("button", "action start chooser-btn", '<span aria-hidden="true">' + d.icon + "</span> " + esc(d.label));
+      b.addEventListener("click", function () {
+        sfx.ok();
+        if (d.fn) d.fn(); else note.textContent = "“" + d.label + "” sắp có, em chờ nhé!";
+      });
+      row.appendChild(b);
+    });
+    c.appendChild(row); c.appendChild(note);
+    app.appendChild(c);
+  }
+
   /* ---------- màn chọn bài ---------- */
   function home() {
     S = null;
     app.innerHTML = ""; clearGhosts();
     var bar = el("div", "topbar");
-    var back = el("button", "back", student() ? "← Trang chủ" : "← Trang đầu");
-    back.addEventListener("click", student() ? studentHome : intro);
-    bar.appendChild(back);
+    bar.appendChild(breadcrumb(rootCrumbs().concat([{ label: "Học bài", fn: chooser }, { label: "Bài tập âm vần" }])));
     app.appendChild(bar);
     var head = el("div", "home-head", SNOWMAN);
     var t = el("div");
