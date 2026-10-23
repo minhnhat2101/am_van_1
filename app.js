@@ -202,7 +202,7 @@
       if (!name) { msg.textContent = "Em hãy viết tên của mình nhé."; inp.focus(); return; }
       go.disabled = true; msg.textContent = "Đang kiểm tra…";
       rpc("login", { p_name: name }).then(function (rows) {
-        if (rows && rows.length) { setStudent({ token: rows[0].token, name: rows[0].full_name }); sfx.ok(); home(); }
+        if (rows && rows.length) { setStudent({ token: rows[0].token, name: rows[0].full_name }); sfx.ok(); studentHome(); }
         else { msg.textContent = "Chưa thấy tên em trong danh sách. Em viết lại nhé!"; go.disabled = false; inp.focus(); }
       }).catch(function (err) {
         msg.textContent = err.message === "no-config" ? "Chưa kết nối được với hệ thống." : "Không kết nối được mạng. Em thử lại nhé!";
@@ -214,19 +214,68 @@
     inp.focus();
   }
 
+  /* ---------- màn Home của học sinh đã đăng nhập ---------- */
+  // Đổi tên/hành vi nút ở đây; fn = null nghĩa là "Sắp có".
+  var SHOME_BUTTONS = [
+    { id: "learn", label: "Học bài", fn: function () { home(); } },
+    { id: "scores", label: "Điểm của em", fn: null },
+    { id: "review", label: "Ôn lại", fn: null }
+  ];
+
+  // Khung hoạt ảnh điểm: sau này chỉ cần thay nội dung hàm này. data = { total, max } hoặc null nếu chưa tải được.
+  function renderScoreStage(box, data) {
+    box.innerHTML = data
+      ? '<div class="shome-total">' + data.total + ' <span>★</span></div><div class="shome-max">trên ' + data.max + ' sao</div>'
+      : '<div class="shome-total">—</div>';
+  }
+
+  function studentHome() {
+    var me = student();
+    if (!me) { intro(); return; }
+    S = null;
+    app.innerHTML = ""; clearGhosts();
+    var bar = el("div", "topbar");
+    bar.appendChild(el("div", "shome-hello", "Chào mừng " + esc(me.name) + "!"));
+    var out = el("button", "back", "Đăng xuất");
+    out.addEventListener("click", function () { setStudent(null); intro(); });
+    bar.appendChild(out);
+    app.appendChild(bar);
+
+    var stage = el("div", "score-stage"); stage.id = "score-stage";
+    renderScoreStage(stage, null);
+    app.appendChild(stage);
+
+    var row = el("div", "shome-btns"), note = el("p", "shome-note");
+    note.setAttribute("role", "status");
+    SHOME_BUTTONS.forEach(function (d) {
+      var b = el("button", "action start", esc(d.label));
+      b.addEventListener("click", function () {
+        sfx.ok();
+        if (d.fn) d.fn(); else note.textContent = "“" + d.label + "” sắp có, em chờ nhé!";
+      });
+      row.appendChild(b);
+    });
+    app.appendChild(row);
+    app.appendChild(note);
+
+    rpc("my_best", { p_token: me.token }).then(function (rows) {
+      if (!stage.isConnected) return;
+      var m = {}, total = 0;
+      (rows || []).forEach(function (r) { m[r.lesson_id] = r.stars; });
+      LESSONS.forEach(function (L) { total += Math.max(0, m[L.id] || 0); });
+      serverBest = m;
+      renderScoreStage(stage, { total: total, max: LESSONS.length * 3 });
+    }).catch(function () { /* mạng yếu thì để "—" */ });
+  }
+
   /* ---------- màn chọn bài ---------- */
   function home() {
     S = null;
     app.innerHTML = ""; clearGhosts();
     var bar = el("div", "topbar");
-    var back = el("button", "back", "← Trang đầu");
-    back.addEventListener("click", intro);
+    var back = el("button", "back", student() ? "← Trang chủ" : "← Trang đầu");
+    back.addEventListener("click", student() ? studentHome : intro);
     bar.appendChild(back);
-    if (student()) {
-      var out = el("button", "back", "Đăng xuất");
-      out.addEventListener("click", function () { setStudent(null); intro(); });
-      bar.appendChild(out);
-    }
     app.appendChild(bar);
     var head = el("div", "home-head", SNOWMAN);
     var t = el("div");
