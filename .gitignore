@@ -1,3 +1,5 @@
 .DS_Store
 supabase/students.sql
 README.md
+CLAUDE.md
+.claude/
